@@ -1,0 +1,2795 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AgentOps Canvas — Tool-Using Agent Simulator</title>
+  <meta name="description" content="Design and simulate tool-using AI agents: graph builder, traces, policies, and strategy comparisons." />
+
+  <!--
+    AgentOps Canvas
+    Single-file app inspired by: Qwen3.6-Plus: Towards real world agents
+    Design goals: dark, glassy, vibrant, responsive, interactive.
+  -->
+
+  <style>
+    :root{
+      --bg:#0a0e17;
+      --panel: rgba(255,255,255,0.06);
+      --panel2: rgba(255,255,255,0.09);
+      --stroke: rgba(255,255,255,0.12);
+      --stroke2: rgba(255,255,255,0.18);
+      --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.68);
+      --faint: rgba(255,255,255,0.44);
+      --accent: #6d5cff;
+      --accent2:#23d5ff;
+      --good:#37f3a5;
+      --warn:#ffcc66;
+      --bad:#ff5c93;
+      --shadow: 0 20px 60px rgba(0,0,0,0.55);
+      --shadow2: 0 10px 30px rgba(0,0,0,0.45);
+      --radius: 18px;
+      --radius2: 14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+
+      --grid: rgba(255,255,255,0.05);
+      --gridBold: rgba(255,255,255,0.09);
+      --chip: rgba(255,255,255,0.08);
+    }
+
+    *{box-sizing:border-box;}
+    html,body{height:100%;}
+    body{
+      margin:0;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(1200px 700px at 18% 10%, rgba(109,92,255,0.25), transparent 55%),
+        radial-gradient(1000px 700px at 85% 15%, rgba(35,213,255,0.18), transparent 55%),
+        radial-gradient(900px 650px at 55% 90%, rgba(55,243,165,0.12), transparent 55%),
+        linear-gradient(180deg, #070a12, var(--bg) 25%, #070a12);
+      overflow-x:hidden;
+    }
+
+    a{color:inherit; text-decoration:none;}
+    button, input, select, textarea{font:inherit;}
+
+    .topbar{
+      position: sticky;
+      top:0;
+      z-index: 50;
+      backdrop-filter: blur(16px);
+      background: linear-gradient(180deg, rgba(10,14,23,0.8), rgba(10,14,23,0.55));
+      border-bottom: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .topbar-inner{
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 14px 16px;
+      display:flex;
+      gap: 12px;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .brand{
+      display:flex;
+      gap: 12px;
+      align-items:center;
+      min-width: 260px;
+    }
+
+    .logo{
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background:
+        radial-gradient(circle at 30% 35%, rgba(255,255,255,0.35), transparent 40%),
+        linear-gradient(135deg, rgba(109,92,255,1), rgba(35,213,255,0.85));
+      box-shadow: 0 10px 30px rgba(109,92,255,0.25);
+      border: 1px solid rgba(255,255,255,0.16);
+      position: relative;
+      overflow:hidden;
+    }
+    .logo:after{
+      content:"";
+      position:absolute; inset:-40px;
+      background: conic-gradient(from 180deg, transparent, rgba(255,255,255,0.25), transparent);
+      animation: spin 6s linear infinite;
+      opacity:0.75;
+    }
+
+    @keyframes spin{to{transform: rotate(360deg);}}
+
+    .brand h1{
+      font-size: 14px;
+      margin:0;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+    .brand .sub{
+      margin-top:2px;
+      font-size: 12px;
+      color: var(--muted);
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: var(--muted);
+      font-size: 12px;
+      user-select:none;
+    }
+
+    .pill b{color: rgba(255,255,255,0.9); font-weight: 700;}
+
+    .actions{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .btn{
+      cursor:pointer;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+      color: rgba(255,255,255,0.92);
+      padding: 10px 12px;
+      border-radius: 12px;
+      box-shadow: var(--shadow2);
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+      display:inline-flex;
+      gap:10px;
+      align-items:center;
+      user-select:none;
+    }
+    .btn:hover{ transform: translateY(-1px); border-color: rgba(255,255,255,0.25); background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.07)); }
+    .btn:active{ transform: translateY(0px) scale(0.99); }
+    .btn.primary{
+      border-color: rgba(109,92,255,0.45);
+      background: linear-gradient(135deg, rgba(109,92,255,0.95), rgba(35,213,255,0.72));
+      box-shadow: 0 18px 50px rgba(109,92,255,0.22);
+    }
+    .btn.primary:hover{ border-color: rgba(255,255,255,0.30); }
+
+    .btn .k{
+      font-family: var(--mono);
+      font-size: 11px;
+      color: rgba(255,255,255,0.86);
+      background: rgba(0,0,0,0.28);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-bottom-color: rgba(255,255,255,0.08);
+      padding: 3px 8px;
+      border-radius: 10px;
+    }
+
+    .layout{
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px;
+      display:grid;
+      grid-template-columns: 360px 1fr 380px;
+      gap: 14px;
+    }
+
+    @media (max-width: 1180px){
+      .layout{ grid-template-columns: 360px 1fr; }
+      .right{ grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 820px){
+      .layout{ grid-template-columns: 1fr; }
+      .brand{ min-width:auto; }
+      .actions{ justify-content:flex-start; }
+    }
+
+    .card{
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,0.12);
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.045));
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position: relative;
+    }
+
+    .card:before{
+      content:"";
+      position:absolute;
+      inset: -2px;
+      background: radial-gradient(900px 250px at 10% 0%, rgba(109,92,255,0.20), transparent 55%),
+                  radial-gradient(700px 240px at 90% 0%, rgba(35,213,255,0.14), transparent 60%);
+      opacity: 0.85;
+      pointer-events:none;
+    }
+
+    .card > *{ position: relative; }
+
+    .card-header{
+      padding: 14px 14px 10px 14px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.10);
+    }
+
+    .card-header h2{
+      font-size: 13px;
+      margin:0;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.82);
+    }
+
+    .card-header p{
+      margin: 6px 0 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height:1.35;
+    }
+
+    .card-body{ padding: 14px; }
+
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    @media (max-width: 820px){
+      .grid2, .grid3{ grid-template-columns: 1fr; }
+    }
+
+    label{display:block; font-size: 12px; color: var(--muted); margin-bottom: 6px;}
+
+    .field{
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 10px 10px;
+      transition: border-color 120ms ease, background 120ms ease;
+    }
+    .field:focus-within{ border-color: rgba(35,213,255,0.38); background: rgba(255,255,255,0.08); }
+
+    input[type="text"], input[type="number"], select, textarea{
+      width:100%;
+      border:0;
+      outline:none;
+      background: transparent;
+      color: rgba(255,255,255,0.92);
+      font-size: 13px;
+    }
+    textarea{ min-height: 76px; resize: vertical; font-family: var(--mono); font-size: 12px; }
+
+    .row{ display:flex; gap: 10px; align-items:center; justify-content:space-between; }
+    .row.tight{gap: 8px;}
+
+    .chip{
+      display:inline-flex;
+      gap: 8px;
+      align-items:center;
+      padding: 6px 10px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 999px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.82);
+      user-select:none;
+      cursor:pointer;
+    }
+    .chip:hover{ border-color: rgba(255,255,255,0.22); }
+    .chip .dot{ width: 8px; height: 8px; border-radius: 999px; background: var(--accent2); box-shadow: 0 0 0 3px rgba(35,213,255,0.18); }
+
+    .chip.warn .dot{ background: var(--warn); box-shadow: 0 0 0 3px rgba(255,204,102,0.16); }
+    .chip.bad .dot{ background: var(--bad); box-shadow: 0 0 0 3px rgba(255,92,147,0.14); }
+    .chip.good .dot{ background: var(--good); box-shadow: 0 0 0 3px rgba(55,243,165,0.14); }
+
+    .divider{ height:1px; background: rgba(255,255,255,0.08); margin: 12px 0; }
+
+    .canvasWrap{
+      position: relative;
+      height: 640px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,0.12);
+      overflow:hidden;
+      background:
+        linear-gradient(90deg, transparent, rgba(255,255,255,0.02)),
+        radial-gradient(1400px 700px at 50% 0%, rgba(109,92,255,0.08), transparent 60%),
+        radial-gradient(900px 600px at 90% 100%, rgba(35,213,255,0.06), transparent 55%),
+        repeating-linear-gradient(0deg, var(--grid) 0px, var(--grid) 1px, transparent 1px, transparent 28px),
+        repeating-linear-gradient(90deg, var(--grid) 0px, var(--grid) 1px, transparent 1px, transparent 28px);
+      box-shadow: var(--shadow);
+    }
+
+    @media (max-width: 1180px){
+      .canvasWrap{ height: 560px; }
+    }
+    @media (max-width: 820px){
+      .canvasWrap{ height: 520px; }
+    }
+
+    canvas{ display:block; width:100%; height:100%; }
+
+    .floating{
+      position:absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display:flex;
+      justify-content:space-between;
+      gap: 10px;
+      pointer-events:none;
+    }
+
+    .floating .mini{
+      pointer-events:auto;
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: rgba(0,0,0,0.28);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+      max-width: 520px;
+    }
+
+    .mini h3{ margin:0 0 6px 0; font-size: 12px; text-transform: uppercase; letter-spacing:0.4px; color: rgba(255,255,255,0.82); }
+    .mini p{ margin:0; font-size: 12px; color: var(--muted); line-height:1.35; }
+
+    .kbd{
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.86);
+    }
+
+    .tabs{
+      display:flex;
+      gap: 8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .tab{
+      cursor:pointer;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.84);
+      font-size: 12px;
+      user-select:none;
+    }
+
+    .tab.active{
+      border-color: rgba(35,213,255,0.35);
+      background: linear-gradient(135deg, rgba(35,213,255,0.22), rgba(109,92,255,0.18));
+      color: rgba(255,255,255,0.94);
+    }
+
+    .metric{
+      display:flex;
+      justify-content:space-between;
+      align-items:baseline;
+      gap: 10px;
+      padding: 10px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.06);
+    }
+
+    .metric .name{ font-size: 12px; color: rgba(255,255,255,0.78); }
+    .metric .val{ font-family: var(--mono); font-size: 12px; color: rgba(255,255,255,0.92); }
+    .metric .bar{
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.10);
+      overflow:hidden;
+      margin-top: 8px;
+    }
+    .metric .bar > i{
+      display:block;
+      height: 100%;
+      width: 40%;
+      background: linear-gradient(90deg, rgba(35,213,255,0.9), rgba(109,92,255,0.9));
+      border-radius: 999px;
+    }
+
+    .trace{
+      display:flex;
+      flex-direction:column;
+      gap: 10px;
+    }
+
+    .event{
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.05);
+      padding: 10px 10px;
+      position: relative;
+      overflow:hidden;
+    }
+
+    .event:before{
+      content:"";
+      position:absolute;
+      inset: 0;
+      background: radial-gradient(600px 220px at 10% 0%, rgba(109,92,255,0.10), transparent 50%);
+      opacity: 0.9;
+      pointer-events:none;
+    }
+
+    .event > *{ position: relative; }
+
+    .event .head{
+      display:flex;
+      gap: 10px;
+      align-items:flex-start;
+      justify-content:space-between;
+    }
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.25);
+      font-size: 12px;
+      color: rgba(255,255,255,0.86);
+      user-select:none;
+    }
+
+    .badge .dot{ width:8px; height:8px; border-radius: 99px; background: var(--accent2); box-shadow: 0 0 0 3px rgba(35,213,255,0.16); }
+    .badge.good .dot{ background: var(--good); box-shadow: 0 0 0 3px rgba(55,243,165,0.14);} 
+    .badge.warn .dot{ background: var(--warn); box-shadow: 0 0 0 3px rgba(255,204,102,0.14);} 
+    .badge.bad  .dot{ background: var(--bad);  box-shadow:  0 0 0 3px rgba(255,92,147,0.14);} 
+
+    .event .meta{
+      display:flex;
+      gap: 10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+      align-items:center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .event pre{
+      margin: 10px 0 0 0;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.25);
+      color: rgba(255,255,255,0.88);
+      overflow:auto;
+      font-size: 12px;
+      line-height: 1.35;
+      font-family: var(--mono);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .footerHint{
+      padding: 14px;
+      color: rgba(255,255,255,0.65);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .toast{
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 90;
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow);
+      display:none;
+      max-width: min(860px, calc(100% - 24px));
+    }
+
+    .toast.show{ display:block; animation: toastIn 220ms ease-out; }
+    @keyframes toastIn{ from{ transform: translateX(-50%) translateY(10px); opacity:0; } to{ transform: translateX(-50%) translateY(0px); opacity:1; } }
+
+    .toast .trow{ display:flex; gap: 10px; align-items:flex-start; justify-content:space-between; }
+    .toast .msg{ font-size: 12px; color: rgba(255,255,255,0.86); line-height: 1.35; }
+
+    .toast .close{ cursor:pointer; user-select:none; opacity: 0.7; }
+    .toast .close:hover{ opacity: 1; }
+
+    .modal{
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display:none;
+      place-items:center;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(10px);
+      padding: 18px;
+    }
+    .modal.show{ display:grid; }
+
+    .modal .box{
+      width: min(980px, 100%);
+      max-height: min(720px, 92vh);
+      overflow:auto;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: linear-gradient(180deg, rgba(18,22,35,0.88), rgba(10,14,23,0.78));
+      box-shadow: 0 30px 120px rgba(0,0,0,0.65);
+      position: relative;
+    }
+
+    .modal .box:before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      background:
+        radial-gradient(900px 280px at 12% 0%, rgba(109,92,255,0.22), transparent 55%),
+        radial-gradient(800px 280px at 88% 0%, rgba(35,213,255,0.16), transparent 60%);
+      opacity:0.85;
+      pointer-events:none;
+    }
+
+    .modal .inner{ position: relative; padding: 16px; }
+
+    .modal .head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.10);
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+    }
+
+    .modal h3{ margin:0; font-size: 14px; letter-spacing: 0.3px; }
+    .modal p{ margin: 6px 0 0 0; font-size: 12px; color: var(--muted); line-height:1.4; }
+
+    .closeX{
+      cursor:pointer;
+      user-select:none;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.06);
+      border:  1px solid rgba(255,255,255,0.12);
+      opacity: 0.9;
+    }
+    .closeX:hover{ opacity:1; border-color: rgba(255,255,255,0.22); }
+
+    .codegrid{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 900px){ .codegrid{ grid-template-columns: 1fr; } }
+
+    .hintList{ display:flex; gap: 8px; flex-wrap:wrap; margin-top: 10px; }
+
+    .small{ font-size: 12px; color: var(--muted); }
+
+    .spark{
+      font-family: var(--mono);
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.25);
+      border-radius: 14px;
+      padding: 10px;
+      overflow:auto;
+      max-height: 260px;
+      white-space: pre;
+    }
+
+    .danger{
+      border-color: rgba(255,92,147,0.28) !important;
+      box-shadow: 0 0 0 3px rgba(255,92,147,0.12);
+    }
+
+    .ok{
+      border-color: rgba(55,243,165,0.25) !important;
+      box-shadow: 0 0 0 3px rgba(55,243,165,0.10);
+    }
+
+    .tinybar{
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.10);
+      overflow:hidden;
+      flex:1;
+    }
+    .tinybar > i{
+      display:block;
+      height:100%;
+      width: 40%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(55,243,165,0.95), rgba(35,213,255,0.85));
+    }
+
+    .muted{ color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>AgentOps Canvas</h1>
+          <div class="sub">
+            <span class="pill"><b>Trend</b> Qwen3.6-Plus agents</span>
+            <span class="pill"><b>Mode</b> offline simulation</span>
+            <span class="pill"><b>Build</b> single file</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="btnTour" title="Show quick tour"><span>Quick tour</span><span class="k">?</span></button>
+        <button class="btn" id="btnShare" title="Copy a shareable URL"><span>Share</span><span class="k">S</span></button>
+        <button class="btn" id="btnReset" title="Reset to default"><span>Reset</span><span class="k">R</span></button>
+        <button class="btn primary" id="btnRun" title="Run the simulation"><span>Run</span><span class="k">Space</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="left card">
+      <div class="card-header">
+        <div>
+          <h2>Agent blueprint</h2>
+          <p>Design a tool-using agent. The simulator estimates cost, latency, safety, and reliability.</p>
+        </div>
+        <div class="tabs" id="strategyTabs">
+          <div class="tab active" data-strategy="react">ReAct</div>
+          <div class="tab" data-strategy="plan">Plan-Execute</div>
+          <div class="tab" data-strategy="reflex">Reflexion</div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="grid2">
+          <div>
+            <label>Agent name</label>
+            <div class="field"><input id="agentName" type="text" value="QwenOps Agent" /></div>
+          </div>
+          <div>
+            <label>Goal template</label>
+            <div class="field">
+              <select id="goalPreset">
+                <option value="ship">Ship a small feature PR</option>
+                <option value="research">Research + summarize</option>
+                <option value="debug">Debug a failing test</option>
+                <option value="incident">On-call incident triage</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <label>Goal prompt</label>
+          <div class="field"><textarea id="goalPrompt"></textarea></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="grid2">
+          <div>
+            <label>Risk tolerance</label>
+            <div class="field">
+              <select id="riskTol">
+                <option value="low">Low (safe, slower)</option>
+                <option value="med" selected>Medium</option>
+                <option value="high">High (fast, risky)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label>Tool permission mode</label>
+            <div class="field">
+              <select id="permMode">
+                <option value="confirm">Confirm dangerous tools</option>
+                <option value="sandbox" selected>Sandbox only</option>
+                <option value="free">Free run (simulated)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:10px;">
+          <div>
+            <label>Step budget</label>
+            <div class="field"><input id="stepBudget" type="number" min="3" max="60" value="18" /></div>
+          </div>
+          <div>
+            <label>Token budget (approx)</label>
+            <div class="field"><input id="tokenBudget" type="number" min="800" max="250000" value="18000" /></div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:10px;">
+          <div>
+            <label>Memory policy</label>
+            <div class="field">
+              <select id="memoryPolicy">
+                <option value="short" selected>Short-term scratchpad</option>
+                <option value="episodic">Episodic notes</option>
+                <option value="vector">Vector store (simulated)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label>Guardrails</label>
+            <div class="field">
+              <select id="guardrails">
+                <option value="strict">Strict</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="loose">Loose</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="row">
+          <div class="small">Tools (click to toggle)</div>
+          <div class="small muted" id="toolCount"></div>
+        </div>
+        <div class="hintList" id="toolChips"></div>
+
+        <div class="divider"></div>
+
+        <div class="row tight">
+          <button class="btn" id="btnAddNode" title="Add a node to the graph"><span>Add node</span><span class="k">A</span></button>
+          <button class="btn" id="btnAutoGraph" title="Auto-build a reasonable agent graph"><span>Auto graph</span><span class="k">G</span></button>
+          <button class="btn" id="btnCompare" title="Run and compare all strategies"><span>Compare</span><span class="k">C</span></button>
+        </div>
+
+        <div class="footerHint">
+          Tip: drag nodes on the canvas. Connect nodes by selecting one, then shift-click another.
+        </div>
+      </div>
+    </section>
+
+    <section class="center">
+      <div class="canvasWrap" id="canvasWrap">
+        <canvas id="canvas"></canvas>
+        <div class="floating">
+          <div class="mini">
+            <h3>Canvas</h3>
+            <p>Drag nodes. <span class="kbd">Shift</span>+click to connect. <span class="kbd">Del</span> deletes. <span class="kbd">Ctrl</span>+wheel zoom. Double click edits.</p>
+          </div>
+          <div class="mini" id="miniStats" style="max-width: 420px; text-align:right;">
+            <h3>Run forecast</h3>
+            <p id="miniForecast">Build a graph to see estimated cost/latency.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="right card">
+      <div class="card-header">
+        <div>
+          <h2>Trace & metrics</h2>
+          <p>Inspect each step. The simulator injects realistic tool failures and safety checks.</p>
+        </div>
+        <div class="tabs" id="rightTabs">
+          <div class="tab active" data-right="trace">Trace</div>
+          <div class="tab" data-right="metrics">Metrics</div>
+          <div class="tab" data-right="compare">Compare</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="panelTrace">
+          <div class="trace" id="traceList"></div>
+        </div>
+
+        <div id="panelMetrics" style="display:none;">
+          <div class="grid2" id="metricGrid"></div>
+          <div class="divider"></div>
+          <div class="small">Why these numbers?</div>
+          <div class="spark" id="metricExplain"></div>
+        </div>
+
+        <div id="panelCompare" style="display:none;">
+          <div class="small">Strategy comparison (same goal, tools, and budgets)</div>
+          <div class="divider"></div>
+          <div id="compareGrid" class="grid3"></div>
+          <div class="divider"></div>
+          <div class="small muted">Click a strategy card to load its blueprint and trace.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast">
+    <div class="trow">
+      <div class="msg" id="toastMsg">Toast</div>
+      <div class="close" id="toastClose">Close</div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="box">
+      <div class="inner">
+        <div class="head">
+          <div>
+            <h3 id="modalTitle">Modal</h3>
+            <p id="modalSub">Sub</p>
+          </div>
+          <div class="closeX" id="modalClose">Close</div>
+        </div>
+
+        <div id="modalBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /*********************************************************************
+     * AgentOps Canvas
+     * Offline, deterministic simulation of tool-using agents.
+     *
+     * Key interactive systems:
+     * - Node graph editor on canvas: drag, connect, delete, edit.
+     * - Tool palette toggles affecting simulation.
+     * - Run engine producing step-by-step trace with realistic events.
+     * - Metrics + explanation.
+     * - Strategy tabs and strategy comparison runner.
+     * - Shareable URL encoding blueprint in hash.
+     *********************************************************************/
+
+    // ---------- Utilities ----------
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+    function lerp(a,b,t){ return a+(b-a)*t; }
+    function rnd(min, max){ return min + Math.random()*(max-min); }
+
+    // Deterministic PRNG (Mulberry32) for reproducible simulations
+    function mulberry32(seed){
+      let t = seed >>> 0;
+      return function(){
+        t += 0x6D2B79F5;
+        let x = t;
+        x = Math.imul(x ^ (x >>> 15), x | 1);
+        x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function hashString(str){
+      // FNV-1a
+      let h = 2166136261;
+      for(let i=0;i<str.length;i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+
+    function fmt(n, digits=2){
+      if(!isFinite(n)) return "—";
+      const abs = Math.abs(n);
+      if(abs >= 1e6) return (n/1e6).toFixed(digits)+"M";
+      if(abs >= 1e3) return (n/1e3).toFixed(digits)+"K";
+      return n.toFixed(digits);
+    }
+
+    function ms(n){ return `${Math.round(n)} ms`; }
+    function usd(n){ return `$${n.toFixed(4)}`; }
+
+    function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+    function nowISO(){ return new Date().toISOString().replace('T',' ').replace('Z',' UTC'); }
+
+    // Simple HTML escaping for injecting strings
+    function esc(s){
+      return String(s)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'",'&#039;');
+    }
+
+    // ---------- App State ----------
+    const state = {
+      strategy: 'react',
+      rightPanel: 'trace',
+      tools: {},
+      nodes: [],
+      edges: [],
+      selectedNodeId: null,
+      hoveredNodeId: null,
+      dragging: null,
+      connectingFrom: null,
+      zoom: 1,
+      pan: {x: 0, y: 0},
+      run: {
+        status: 'idle',
+        seed: 0,
+        events: [],
+        metrics: null,
+        explain: '',
+        compare: null,
+      },
+      ui: {
+        toastTimer: null,
+      }
+    };
+
+    const TOOLS = [
+      {id:'web', name:'Web search', kind:'info', risk: 0.25, latency: 1600, cost: 0.0005},
+      {id:'repo', name:'Repo read', kind:'info', risk: 0.12, latency: 1200, cost: 0.0003},
+      {id:'code', name:'Code exec', kind:'act', risk: 0.45, latency: 2200, cost: 0.0012},
+      {id:'tests', name:'Run tests', kind:'act', risk: 0.35, latency: 3800, cost: 0.0018},
+      {id:'files', name:'File patch', kind:'act', risk: 0.55, latency: 1700, cost: 0.0010},
+      {id:'db', name:'DB query', kind:'act', risk: 0.50, latency: 2100, cost: 0.0014},
+      {id:'email', name:'Email draft', kind:'act', risk: 0.30, latency: 1100, cost: 0.0007},
+      {id:'deploy', name:'Deploy', kind:'act', risk: 0.72, latency: 5200, cost: 0.0022},
+      {id:'calendar', name:'Calendar read', kind:'info', risk: 0.18, latency: 900, cost: 0.0004},
+      {id:'notion', name:'Notion write', kind:'act', risk: 0.62, latency: 1800, cost: 0.0015},
+      {id:'slack', name:'Slack post', kind:'act', risk: 0.58, latency: 1300, cost: 0.0012},
+    ];
+
+    const NODE_TYPES = [
+      {id:'planner', name:'Planner', color:'#6d5cff'},
+      {id:'researcher', name:'Researcher', color:'#23d5ff'},
+      {id:'coder', name:'Coder', color:'#37f3a5'},
+      {id:'critic', name:'Critic', color:'#ffcc66'},
+      {id:'tool', name:'Tool', color:'#ff5c93'},
+      {id:'memory', name:'Memory', color:'#b48cff'},
+    ];
+
+    const DEFAULT_BLUEPRINT = {
+      agentName: 'QwenOps Agent',
+      goalPreset: 'ship',
+      goalPrompt: '',
+      riskTol: 'med',
+      permMode: 'sandbox',
+      stepBudget: 18,
+      tokenBudget: 18000,
+      memoryPolicy: 'short',
+      guardrails: 'balanced',
+      strategy: 'react',
+      toolsEnabled: {
+        web: true,
+        repo: true,
+        code: true,
+        tests: true,
+        files: true,
+        db: false,
+        email: false,
+        deploy: false,
+        calendar: false,
+        notion: false,
+        slack: false,
+      },
+      nodes: [
+        {id:'n1', type:'planner', label:'Planner', x: 140, y: 130, params:{style:'goal-first', temperature:0.35}},
+        {id:'n2', type:'researcher', label:'Research', x: 360, y: 240, params:{depth:2, citations:true}},
+        {id:'n3', type:'coder', label:'Implement', x: 560, y: 160, params:{diffMode:true, lint:true}},
+        {id:'n4', type:'critic', label:'Review', x: 760, y: 260, params:{strictness:0.7}},
+        {id:'n5', type:'tool', label:'Tools', x: 560, y: 360, params:{toolset:['repo','code','tests','files']}},
+        {id:'n6', type:'memory', label:'Notes', x: 360, y: 380, params:{policy:'short', maxItems:14}},
+      ],
+      edges: [
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'n3'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'n1'},
+        {from:'n3', to:'n5'},
+        {from:'n2', to:'n6'},
+      ]
+    };
+
+    const GOAL_PRESETS = {
+      ship: {
+        title: 'Ship a small feature PR',
+        prompt: `You are a tool-using coding agent. Goal: ship a small feature PR.
+
+Constraints:
+- Keep scope minimal.
+- Write tests.
+- Provide a short PR description.
+
+Task:
+Add a "smart retry" wrapper around a flaky network call in the codebase and ensure tests are stable.`,
+      },
+      research: {
+        title: 'Research + summarize',
+        prompt: `You are a research agent. Goal: produce a concise, sourced summary.
+
+Task:
+Compare three approaches to building tool-using agents (ReAct, Plan-Execute, Reflexion).
+Provide a short rubric and recommend a default for a small team shipping weekly.`,
+      },
+      debug: {
+        title: 'Debug a failing test',
+        prompt: `You are an on-call coding agent. Goal: fix a failing test quickly and safely.
+
+Task:
+A CI job intermittently fails with a timeout. Identify likely causes, propose 3 fixes, and implement the safest fix with tests.`,
+      },
+      incident: {
+        title: 'On-call incident triage',
+        prompt: `You are a triage agent. Goal: stabilize production.
+
+Task:
+Investigate elevated error rates after a deploy. Collect signals, propose rollback vs hotfix, draft an incident update.
+Do not perform destructive actions without confirmation.`,
+      }
+    };
+
+    // ---------- DOM references ----------
+    const el = {
+      agentName: $('#agentName'),
+      goalPreset: $('#goalPreset'),
+      goalPrompt: $('#goalPrompt'),
+      riskTol: $('#riskTol'),
+      permMode: $('#permMode'),
+      stepBudget: $('#stepBudget'),
+      tokenBudget: $('#tokenBudget'),
+      memoryPolicy: $('#memoryPolicy'),
+      guardrails: $('#guardrails'),
+
+      toolChips: $('#toolChips'),
+      toolCount: $('#toolCount'),
+
+      btnRun: $('#btnRun'),
+      btnReset: $('#btnReset'),
+      btnShare: $('#btnShare'),
+      btnTour: $('#btnTour'),
+      btnAddNode: $('#btnAddNode'),
+      btnAutoGraph: $('#btnAutoGraph'),
+      btnCompare: $('#btnCompare'),
+
+      canvas: $('#canvas'),
+      canvasWrap: $('#canvasWrap'),
+
+      traceList: $('#traceList'),
+      metricGrid: $('#metricGrid'),
+      metricExplain: $('#metricExplain'),
+      miniForecast: $('#miniForecast'),
+
+      rightTabs: $('#rightTabs'),
+      panelTrace: $('#panelTrace'),
+      panelMetrics: $('#panelMetrics'),
+      panelCompare: $('#panelCompare'),
+      compareGrid: $('#compareGrid'),
+
+      toast: $('#toast'),
+      toastMsg: $('#toastMsg'),
+      toastClose: $('#toastClose'),
+
+      modal: $('#modal'),
+      modalTitle: $('#modalTitle'),
+      modalSub: $('#modalSub'),
+      modalBody: $('#modalBody'),
+      modalClose: $('#modalClose'),
+
+      strategyTabs: $('#strategyTabs'),
+    };
+
+    // Canvas context
+    const ctx = el.canvas.getContext('2d');
+
+    // ---------- Setup ----------
+    function applyBlueprint(bp){
+      el.agentName.value = bp.agentName;
+      el.goalPreset.value = bp.goalPreset;
+      el.goalPrompt.value = bp.goalPrompt || GOAL_PRESETS[bp.goalPreset].prompt;
+      el.riskTol.value = bp.riskTol;
+      el.permMode.value = bp.permMode;
+      el.stepBudget.value = bp.stepBudget;
+      el.tokenBudget.value = bp.tokenBudget;
+      el.memoryPolicy.value = bp.memoryPolicy;
+      el.guardrails.value = bp.guardrails;
+
+      state.strategy = bp.strategy;
+      updateStrategyTabs();
+
+      state.tools = deepClone(bp.toolsEnabled);
+      state.nodes = deepClone(bp.nodes);
+      state.edges = deepClone(bp.edges);
+      state.selectedNodeId = null;
+      state.connectingFrom = null;
+      state.zoom = 1;
+      state.pan = {x: 0, y: 0};
+
+      renderToolChips();
+      recalcForecast();
+      renderTrace();
+      renderMetrics();
+      renderCompare();
+      draw();
+    }
+
+    function init(){
+      applyBlueprint(loadFromHash() || DEFAULT_BLUEPRINT);
+      attachHandlers();
+      resizeCanvas();
+      window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+      requestAnimationFrame(tick);
+      toast('Loaded. Press Space to run, Shift+click to connect.');
+    }
+
+    // ---------- Tool chips ----------
+    function renderToolChips(){
+      el.toolChips.innerHTML = '';
+      const enabled = Object.entries(state.tools).filter(([k,v]) => v).map(([k]) => k);
+      el.toolCount.textContent = `${enabled.length}/${TOOLS.length} enabled`;
+
+      for(const t of TOOLS){
+        const on = !!state.tools[t.id];
+        const chip = document.createElement('div');
+        chip.className = 'chip ' + (on ? 'good' : '');
+        chip.title = on ? 'Enabled' : 'Disabled';
+        chip.innerHTML = `<span class="dot"></span><span>${esc(t.name)}</span>`;
+        chip.addEventListener('click', () => {
+          state.tools[t.id] = !state.tools[t.id];
+          renderToolChips();
+          recalcForecast();
+        });
+        el.toolChips.appendChild(chip);
+      }
+    }
+
+    // ---------- Strategy tabs ----------
+    function updateStrategyTabs(){
+      $$('.tab', el.strategyTabs).forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.strategy === state.strategy);
+      });
+    }
+
+    // ---------- Right panel tabs ----------
+    function setRightPanel(panel){
+      state.rightPanel = panel;
+      $$('.tab', el.rightTabs).forEach(tab => tab.classList.toggle('active', tab.dataset.right === panel));
+      el.panelTrace.style.display = panel === 'trace' ? '' : 'none';
+      el.panelMetrics.style.display = panel === 'metrics' ? '' : 'none';
+      el.panelCompare.style.display = panel === 'compare' ? '' : 'none';
+    }
+
+    // ---------- Canvas coordinate transforms ----------
+    function canvasToWorld(px, py){
+      const rect = el.canvas.getBoundingClientRect();
+      const x = (px - rect.left - rect.width/2) / state.zoom - state.pan.x;
+      const y = (py - rect.top - rect.height/2) / state.zoom - state.pan.y;
+      return {x, y};
+    }
+
+    function worldToCanvas(x, y){
+      const rect = el.canvas.getBoundingClientRect();
+      return {
+        x: (x + state.pan.x) * state.zoom + rect.width/2,
+        y: (y + state.pan.y) * state.zoom + rect.height/2
+      };
+    }
+
+    // ---------- Node helpers ----------
+    function typeInfo(type){ return NODE_TYPES.find(t => t.id === type) || NODE_TYPES[0]; }
+
+    function newId(prefix='n'){
+      const s = Math.random().toString(16).slice(2,8);
+      return `${prefix}${s}`;
+    }
+
+    function nodeById(id){ return state.nodes.find(n => n.id === id); }
+
+    function edgeExists(a,b){
+      return state.edges.some(e => e.from === a && e.to === b);
+    }
+
+    function deleteNode(id){
+      state.nodes = state.nodes.filter(n => n.id !== id);
+      state.edges = state.edges.filter(e => e.from !== id && e.to !== id);
+      if(state.selectedNodeId === id) state.selectedNodeId = null;
+      if(state.connectingFrom === id) state.connectingFrom = null;
+      recalcForecast();
+      draw();
+      toast('Node deleted.');
+    }
+
+    function deleteEdge(from,to){
+      state.edges = state.edges.filter(e => !(e.from===from && e.to===to));
+      recalcForecast();
+      draw();
+      toast('Connection removed.');
+    }
+
+    function addNode(type='tool', x=0, y=0){
+      const info = typeInfo(type);
+      const node = {
+        id: newId('n'),
+        type,
+        label: info.name,
+        x, y,
+        params: defaultParamsForType(type),
+      };
+      state.nodes.push(node);
+      state.selectedNodeId = node.id;
+      recalcForecast();
+      draw();
+      return node;
+    }
+
+    function defaultParamsForType(type){
+      switch(type){
+        case 'planner': return {style:'goal-first', temperature:0.35};
+        case 'researcher': return {depth:2, citations:true};
+        case 'coder': return {diffMode:true, lint:true};
+        case 'critic': return {strictness:0.7};
+        case 'tool': return {toolset: enabledTools().slice(0,4)};
+        case 'memory': return {policy: el.memoryPolicy.value || 'short', maxItems: 14};
+        default: return {};
+      }
+    }
+
+    function enabledTools(){
+      return Object.entries(state.tools).filter(([k,v]) => v).map(([k]) => k);
+    }
+
+    // ---------- Drawing ----------
+    function resizeCanvas(){
+      const rect = el.canvasWrap.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      el.canvas.width = Math.round(rect.width * dpr);
+      el.canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+
+    function draw(){
+      const rect = el.canvas.getBoundingClientRect();
+      ctx.clearRect(0,0,rect.width, rect.height);
+
+      // Draw edges first
+      for(const e of state.edges){
+        const a = nodeById(e.from);
+        const b = nodeById(e.to);
+        if(!a || !b) continue;
+        drawEdge(a,b, e);
+      }
+
+      // Connecting preview
+      if(state.connectingFrom){
+        const from = nodeById(state.connectingFrom);
+        if(from && state.mouse){
+          const p1 = worldToCanvas(from.x, from.y);
+          const p2 = state.mouse;
+          drawBezier(p1.x, p1.y, p2.x, p2.y, 'rgba(35,213,255,0.55)', 2, true);
+        }
+      }
+
+      // Draw nodes
+      for(const n of state.nodes){
+        drawNode(n);
+      }
+
+      // HUD: quick hints on empty
+      if(state.nodes.length === 0){
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = '600 14px ' + getComputedStyle(document.body).fontFamily;
+        ctx.fillText('Click “Add node” or press A to start.', 28, 46);
+        ctx.restore();
+      }
+    }
+
+    function drawEdge(a,b, e){
+      const p1 = worldToCanvas(a.x, a.y);
+      const p2 = worldToCanvas(b.x, b.y);
+      const sel = (state.selectedNodeId === a.id || state.selectedNodeId === b.id);
+      const color = sel ? 'rgba(109,92,255,0.65)' : 'rgba(255,255,255,0.18)';
+      const width = sel ? 2.2 : 1.5;
+      drawBezier(p1.x, p1.y, p2.x, p2.y, color, width);
+
+      // arrow head
+      const mid = bezierPoint(p1,p2,0.56);
+      const dir = bezierTangent(p1,p2,0.56);
+      const ang = Math.atan2(dir.y, dir.x);
+      ctx.save();
+      ctx.translate(mid.x, mid.y);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(-8, -4);
+      ctx.lineTo(-8, 4);
+      ctx.closePath();
+      ctx.fillStyle = sel ? 'rgba(35,213,255,0.55)' : 'rgba(255,255,255,0.16)';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBezier(x1,y1,x2,y2,color,width, dashed=false){
+      const dx = (x2-x1);
+      const dy = (y2-y1);
+      const c1x = x1 + dx*0.35;
+      const c1y = y1 + dy*0.05;
+      const c2x = x2 - dx*0.35;
+      const c2y = y2 - dy*0.05;
+      ctx.save();
+      ctx.beginPath();
+      if(dashed) ctx.setLineDash([6,6]);
+      ctx.moveTo(x1,y1);
+      ctx.bezierCurveTo(c1x,c1y,c2x,c2y,x2,y2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function bezierPoint(p1,p2,t){
+      const dx = (p2.x - p1.x);
+      const dy = (p2.y - p1.y);
+      const c1 = {x: p1.x + dx*0.35, y: p1.y + dy*0.05};
+      const c2 = {x: p2.x - dx*0.35, y: p2.y - dy*0.05};
+      // cubic bezier formula
+      const u = 1-t;
+      const x = u*u*u*p1.x + 3*u*u*t*c1.x + 3*u*t*t*c2.x + t*t*t*p2.x;
+      const y = u*u*u*p1.y + 3*u*u*t*c1.y + 3*u*t*t*c2.y + t*t*t*p2.y;
+      return {x,y};
+    }
+
+    function bezierTangent(p1,p2,t){
+      const dx = (p2.x - p1.x);
+      const dy = (p2.y - p1.y);
+      const c1 = {x: p1.x + dx*0.35, y: p1.y + dy*0.05};
+      const c2 = {x: p2.x - dx*0.35, y: p2.y - dy*0.05};
+      const u = 1-t;
+      const x = 3*u*u*(c1.x - p1.x) + 6*u*t*(c2.x - c1.x) + 3*t*t*(p2.x - c2.x);
+      const y = 3*u*u*(c1.y - p1.y) + 6*u*t*(c2.y - c1.y) + 3*t*t*(p2.y - c2.y);
+      return {x,y};
+    }
+
+    function drawNode(n){
+      const p = worldToCanvas(n.x, n.y);
+      const info = typeInfo(n.type);
+      const r = 42;
+
+      const selected = (n.id === state.selectedNodeId);
+      const hovered = (n.id === state.hoveredNodeId);
+
+      ctx.save();
+      // shadow
+      ctx.beginPath();
+      ctx.arc(p.x, p.y+2, r, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+
+      // body
+      const grad = ctx.createRadialGradient(p.x-10,p.y-12,8,p.x,p.y,r+16);
+      grad.addColorStop(0, 'rgba(255,255,255,0.14)');
+      grad.addColorStop(0.35, 'rgba(255,255,255,0.06)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.20)');
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // outline
+      ctx.lineWidth = selected ? 2.8 : hovered ? 2.0 : 1.4;
+      ctx.strokeStyle = selected ? 'rgba(35,213,255,0.75)' : hovered ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.14)';
+      ctx.stroke();
+
+      // inner ring
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r-10, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // icon dot
+      ctx.beginPath();
+      ctx.arc(p.x-20, p.y-18, 6, 0, Math.PI*2);
+      ctx.fillStyle = info.color;
+      ctx.shadowColor = info.color;
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // type
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
+      ctx.font = '600 12px ' + getComputedStyle(document.body).fontFamily;
+      ctx.textAlign = 'center';
+      ctx.fillText(info.name, p.x, p.y - 4);
+
+      // label
+      ctx.fillStyle = 'rgba(255,255,255,0.70)';
+      ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+      ctx.fillText(n.label, p.x, p.y + 16);
+
+      // selection handle
+      if(selected){
+        ctx.beginPath();
+        ctx.arc(p.x + 26, p.y - 26, 6.5, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(35,213,255,0.90)';
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // ---------- Interaction: canvas ----------
+    function pickNode(px,py){
+      const w = canvasToWorld(px,py);
+      // nodes are circles radius ~42
+      for(let i=state.nodes.length-1;i>=0;i--){
+        const n = state.nodes[i];
+        const dx = w.x - n.x;
+        const dy = w.y - n.y;
+        if(dx*dx + dy*dy <= 42*42) return n;
+      }
+      return null;
+    }
+
+    function pickEdge(px,py){
+      // approximate: check distance to bezier sampled points
+      const rect = el.canvas.getBoundingClientRect();
+      const x = px - rect.left;
+      const y = py - rect.top;
+      for(const e of state.edges){
+        const a = nodeById(e.from), b = nodeById(e.to);
+        if(!a||!b) continue;
+        const p1 = worldToCanvas(a.x, a.y);
+        const p2 = worldToCanvas(b.x, b.y);
+        let minD = 1e9;
+        for(let i=0;i<=18;i++){
+          const t = i/18;
+          const p = bezierPoint(p1,p2,t);
+          const dx = p.x - x;
+          const dy = p.y - y;
+          const d = Math.sqrt(dx*dx+dy*dy);
+          minD = Math.min(minD, d);
+        }
+        if(minD < 8) return e;
+      }
+      return null;
+    }
+
+    function attachHandlers(){
+      // Inputs update forecast
+      for(const input of [el.agentName, el.goalPreset, el.goalPrompt, el.riskTol, el.permMode, el.stepBudget, el.tokenBudget, el.memoryPolicy, el.guardrails]){
+        input.addEventListener('input', () => { recalcForecast(); });
+        input.addEventListener('change', () => { recalcForecast(); });
+      }
+
+      el.goalPreset.addEventListener('change', () => {
+        el.goalPrompt.value = GOAL_PRESETS[el.goalPreset.value].prompt;
+        recalcForecast();
+      });
+
+      // Strategy tabs
+      $$('.tab', el.strategyTabs).forEach(tab => {
+        tab.addEventListener('click', () => {
+          state.strategy = tab.dataset.strategy;
+          updateStrategyTabs();
+          recalcForecast();
+          toast(`Strategy set: ${tab.textContent}`);
+        });
+      });
+
+      // Right tabs
+      $$('.tab', el.rightTabs).forEach(tab => {
+        tab.addEventListener('click', () => {
+          setRightPanel(tab.dataset.right);
+        });
+      });
+
+      // Buttons
+      el.btnRun.addEventListener('click', () => runOnce());
+      el.btnReset.addEventListener('click', () => {
+        applyBlueprint(DEFAULT_BLUEPRINT);
+        setRightPanel('trace');
+        toast('Reset to default blueprint.');
+        updateHash();
+      });
+
+      el.btnShare.addEventListener('click', () => {
+        updateHash();
+        navigator.clipboard.writeText(location.href).then(() => toast('Shareable URL copied to clipboard.'), () => toast('Could not copy; URL hash updated.'));
+      });
+
+      el.btnTour.addEventListener('click', () => showTour());
+
+      el.btnAddNode.addEventListener('click', () => {
+        const center = canvasToWorld(el.canvas.getBoundingClientRect().left + el.canvas.getBoundingClientRect().width/2, el.canvas.getBoundingClientRect().top + el.canvas.getBoundingClientRect().height/2);
+        const n = addNode('tool', center.x + rnd(-40,40), center.y + rnd(-40,40));
+        openNodeEditor(n);
+        updateHash();
+      });
+
+      el.btnAutoGraph.addEventListener('click', () => {
+        autoGraph();
+        updateHash();
+      });
+
+      el.btnCompare.addEventListener('click', () => compareStrategies());
+
+      // Toast close
+      el.toastClose.addEventListener('click', () => hideToast());
+
+      // Modal close
+      el.modalClose.addEventListener('click', () => closeModal());
+      el.modal.addEventListener('click', (e) => {
+        if(e.target === el.modal) closeModal();
+      });
+
+      // Canvas pointer
+      el.canvas.addEventListener('mousemove', (e) => {
+        state.mouse = {x: e.clientX - el.canvas.getBoundingClientRect().left, y: e.clientY - el.canvas.getBoundingClientRect().top};
+        const n = pickNode(e.clientX, e.clientY);
+        state.hoveredNodeId = n ? n.id : null;
+        if(state.dragging){
+          const w = canvasToWorld(e.clientX, e.clientY);
+          const node = nodeById(state.dragging.id);
+          if(node){
+            node.x = w.x - state.dragging.offx;
+            node.y = w.y - state.dragging.offy;
+            recalcForecast();
+            draw();
+          }
+        }
+      });
+
+      el.canvas.addEventListener('mousedown', (e) => {
+        const n = pickNode(e.clientX, e.clientY);
+        if(n){
+          state.selectedNodeId = n.id;
+          const w = canvasToWorld(e.clientX, e.clientY);
+          state.dragging = {id:n.id, offx: w.x - n.x, offy: w.y - n.y};
+          draw();
+        } else {
+          state.selectedNodeId = null;
+          state.connectingFrom = null;
+          draw();
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if(state.dragging){
+          state.dragging = null;
+          updateHash();
+        }
+      });
+
+      el.canvas.addEventListener('dblclick', (e) => {
+        const n = pickNode(e.clientX, e.clientY);
+        if(n){
+          openNodeEditor(n);
+        } else {
+          const edge = pickEdge(e.clientX, e.clientY);
+          if(edge){
+            confirmModal('Remove connection?', `Remove edge from <b>${esc(nodeById(edge.from)?.label||edge.from)}</b> to <b>${esc(nodeById(edge.to)?.label||edge.to)}</b>?`, () => {
+              deleteEdge(edge.from, edge.to);
+              updateHash();
+            });
+          }
+        }
+      });
+
+      el.canvas.addEventListener('click', (e) => {
+        const n = pickNode(e.clientX, e.clientY);
+        if(!n) return;
+
+        if(e.shiftKey){
+          if(!state.connectingFrom){
+            state.connectingFrom = n.id;
+            toast('Select target node to connect.');
+          } else if(state.connectingFrom === n.id){
+            state.connectingFrom = null;
+            toast('Connection cancelled.');
+          } else {
+            if(!edgeExists(state.connectingFrom, n.id)){
+              state.edges.push({from: state.connectingFrom, to: n.id});
+              toast('Connected.');
+            } else {
+              toast('Connection already exists.');
+            }
+            state.connectingFrom = null;
+            recalcForecast();
+            updateHash();
+            draw();
+          }
+        }
+      });
+
+      // Wheel zoom / pan
+      el.canvas.addEventListener('wheel', (e) => {
+        if(e.ctrlKey){
+          e.preventDefault();
+          const z0 = state.zoom;
+          const delta = Math.sign(e.deltaY);
+          const z1 = clamp(z0 * (delta>0 ? 0.92 : 1.08), 0.55, 2.2);
+          state.zoom = z1;
+          draw();
+        } else {
+          // pan
+          state.pan.x -= e.deltaX / state.zoom;
+          state.pan.y -= e.deltaY / state.zoom;
+          draw();
+        }
+      }, {passive:false});
+
+      // Keyboard shortcuts
+      window.addEventListener('keydown', (e) => {
+        if(e.target && ['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+
+        if(e.code === 'Space'){
+          e.preventDefault();
+          runOnce();
+        }
+        if(e.key === 'r' || e.key === 'R'){
+          applyBlueprint(DEFAULT_BLUEPRINT);
+          toast('Reset.');
+          updateHash();
+        }
+        if(e.key === 's' || e.key === 'S'){
+          updateHash();
+          navigator.clipboard.writeText(location.href).then(() => toast('URL copied.'), () => toast('URL updated.'));
+        }
+        if(e.key === 'a' || e.key === 'A'){
+          const center = canvasToWorld(el.canvas.getBoundingClientRect().left + el.canvas.getBoundingClientRect().width/2, el.canvas.getBoundingClientRect().top + el.canvas.getBoundingClientRect().height/2);
+          const n = addNode('tool', center.x + rnd(-40,40), center.y + rnd(-40,40));
+          openNodeEditor(n);
+          updateHash();
+        }
+        if(e.key === 'g' || e.key === 'G'){
+          autoGraph();
+          updateHash();
+        }
+        if(e.key === 'c' || e.key === 'C'){
+          compareStrategies();
+        }
+        if(e.key === 'Delete' || e.key === 'Backspace'){
+          if(state.selectedNodeId){
+            deleteNode(state.selectedNodeId);
+            updateHash();
+          }
+        }
+        if(e.key === '?' || (e.shiftKey && e.key === '/')){
+          showTour();
+        }
+      });
+    }
+
+    // ---------- Modal helpers ----------
+    function openModal(title, sub, html){
+      el.modalTitle.textContent = title;
+      el.modalSub.innerHTML = sub;
+      el.modalBody.innerHTML = html;
+      el.modal.classList.add('show');
+    }
+
+    function closeModal(){
+      el.modal.classList.remove('show');
+    }
+
+    function confirmModal(title, sub, onYes){
+      openModal(title, sub, `
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" id="mCancel">Cancel</button>
+          <button class="btn primary" id="mYes">Yes</button>
+        </div>
+      `);
+      $('#mCancel').addEventListener('click', closeModal);
+      $('#mYes').addEventListener('click', () => { closeModal(); onYes(); });
+    }
+
+    function showTour(){
+      openModal('Quick tour', 'A mini guide to the simulator.', `
+        <div class="codegrid">
+          <div class="card" style="box-shadow:none;">
+            <div class="card-header"><div><h2>Build</h2><p>Create an agent graph and choose tools.</p></div></div>
+            <div class="card-body">
+              <div class="small">Shortcuts</div>
+              <div class="divider"></div>
+              <div class="hintList">
+                <span class="pill"><b>Space</b> run</span>
+                <span class="pill"><b>A</b> add node</span>
+                <span class="pill"><b>Shift+click</b> connect</span>
+                <span class="pill"><b>Del</b> delete</span>
+                <span class="pill"><b>Ctrl+wheel</b> zoom</span>
+                <span class="pill"><b>Wheel</b> pan</span>
+              </div>
+              <div class="divider"></div>
+              <div class="small muted">Double-click a node to edit parameters (e.g., research depth or critic strictness).</div>
+            </div>
+          </div>
+          <div class="card" style="box-shadow:none;">
+            <div class="card-header"><div><h2>Run</h2><p>Deterministic simulation with realistic errors.</p></div></div>
+            <div class="card-body">
+              <div class="small muted">The simulator estimates tokens/cost and injects:
+                <ul>
+                  <li>Tool timeouts</li>
+                  <li>Safety policy blocks</li>
+                  <li>Hallucinated citations</li>
+                  <li>Test failures</li>
+                </ul>
+              </div>
+              <div class="divider"></div>
+              <div class="small">Try it: enable Deploy, set Perm Mode to Confirm, then run.</div>
+            </div>
+          </div>
+        </div>
+      `);
+    }
+
+    // ---------- Node editor ----------
+    function openNodeEditor(node){
+      const info = typeInfo(node.type);
+      const params = node.params || {};
+
+      const typeOptions = NODE_TYPES.map(t => `<option value="${t.id}" ${t.id===node.type?'selected':''}>${esc(t.name)}</option>`).join('');
+
+      const toolOptions = TOOLS.map(t => {
+        const on = (params.toolset || []).includes(t.id);
+        const disabled = !state.tools[t.id];
+        return `<label style="display:flex; gap:10px; align-items:center; margin:6px 0; opacity:${disabled?0.55:1};">
+          <input type="checkbox" data-toolpick="${t.id}" ${on?'checked':''} ${disabled?'disabled':''}/>
+          <span>${esc(t.name)}</span>
+          <span class="muted" style="margin-left:auto; font-family:var(--mono); font-size:11px;">risk ${t.risk.toFixed(2)}</span>
+        </label>`;
+      }).join('');
+
+      const html = `
+        <div class="grid2">
+          <div>
+            <label>Type</label>
+            <div class="field"><select id="neType">${typeOptions}</select></div>
+          </div>
+          <div>
+            <label>Label</label>
+            <div class="field"><input id="neLabel" type="text" value="${esc(node.label)}" /></div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="grid2">
+          <div>
+            <label>Temperature / strictness</label>
+            <div class="field"><input id="neTemp" type="number" min="0" max="1" step="0.05" value="${esc(params.temperature ?? params.strictness ?? 0.35)}" /></div>
+            <div class="small muted" style="margin-top:8px;">Planner uses temperature. Critic uses strictness (higher = more nitpicky).</div>
+          </div>
+          <div>
+            <label>Research depth</label>
+            <div class="field"><input id="neDepth" type="number" min="1" max="6" step="1" value="${esc(params.depth ?? 2)}" /></div>
+            <div class="small muted" style="margin-top:8px;">Depth influences tokens, latency, and failure rate.</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <label>Tool set (only for Tool nodes)</label>
+          <div class="field" style="padding: 12px;">
+            ${toolOptions}
+          </div>
+          <div class="small muted" style="margin-top:8px;">Tool nodes call enabled tools. If a tool is disabled in the left panel, it cannot be selected here.</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="row">
+          <button class="btn" id="neDelete">Delete node</button>
+          <button class="btn primary" id="neSave">Save</button>
+        </div>
+      `;
+
+      openModal(`Edit node: ${info.name}`, 'Configure role-specific parameters.', html);
+
+      $('#neDelete').addEventListener('click', () => {
+        closeModal();
+        deleteNode(node.id);
+        updateHash();
+      });
+
+      $('#neSave').addEventListener('click', () => {
+        const newType = $('#neType').value;
+        const newLabel = $('#neLabel').value.trim() || typeInfo(newType).name;
+        const temp = parseFloat($('#neTemp').value);
+        const depth = parseInt($('#neDepth').value, 10);
+
+        node.type = newType;
+        node.label = newLabel;
+
+        // rebuild params by type with some carryover
+        const p = defaultParamsForType(newType);
+        if(newType === 'planner') p.temperature = clamp(temp,0,1);
+        if(newType === 'critic') p.strictness = clamp(temp,0,1);
+        if(newType === 'researcher') p.depth = clamp(depth,1,6);
+        if(newType === 'tool'){
+          const picks = $$('[data-toolpick]')
+            .filter(x => x.checked)
+            .map(x => x.dataset.toolpick);
+          p.toolset = picks;
+        }
+        node.params = p;
+
+        closeModal();
+        recalcForecast();
+        draw();
+        updateHash();
+        toast('Node updated.');
+      });
+    }
+
+    // ---------- Autograph ----------
+    function autoGraph(){
+      const baseX = 90, baseY = 70;
+      state.nodes = [];
+      state.edges = [];
+      const types = ['planner','researcher','coder','critic','tool','memory'];
+      const positions = [
+        [baseX+120, baseY+90],
+        [baseX+330, baseY+180],
+        [baseX+560, baseY+110],
+        [baseX+760, baseY+210],
+        [baseX+560, baseY+350],
+        [baseX+330, baseY+350],
+      ];
+      const ids = {};
+      types.forEach((t, idx) => {
+        const [x,y] = positions[idx];
+        const n = addNode(t, x, y);
+        n.label = typeInfo(t).name;
+        ids[t] = n.id;
+      });
+
+      state.edges.push({from: ids.planner, to: ids.researcher});
+      state.edges.push({from: ids.researcher, to: ids.coder});
+      state.edges.push({from: ids.coder, to: ids.critic});
+      state.edges.push({from: ids.critic, to: ids.planner});
+      state.edges.push({from: ids.coder, to: ids.tool});
+      state.edges.push({from: ids.researcher, to: ids.memory});
+
+      state.selectedNodeId = ids.planner;
+      state.connectingFrom = null;
+      recalcForecast();
+      draw();
+      toast('Auto graph created.');
+    }
+
+    // ---------- Forecast / Metrics model ----------
+    function recalcForecast(){
+      const bp = currentBlueprint();
+      const toolList = enabledTools();
+      const toolRisk = toolList.reduce((sum, id) => sum + (TOOLS.find(t => t.id===id)?.risk||0), 0) / Math.max(1, toolList.length);
+
+      const depth = state.nodes.reduce((sum,n) => sum + (n.type==='researcher' ? (n.params?.depth||2) : 0), 0);
+      const strict = state.nodes.reduce((sum,n) => sum + (n.type==='critic' ? (n.params?.strictness||0.7) : 0), 0);
+      const temps = state.nodes.reduce((sum,n) => sum + (n.type==='planner' ? (n.params?.temperature||0.35) : 0), 0);
+      const nNodes = state.nodes.length;
+      const nEdges = state.edges.length;
+
+      const baseSteps = clamp(parseInt(bp.stepBudget,10)||18, 3, 60);
+      const tokenBudget = clamp(parseInt(bp.tokenBudget,10)||18000, 800, 250000);
+
+      // Strategy multipliers
+      const strat = bp.strategy;
+      const stratMult = strat === 'react' ? 1.0 : strat === 'plan' ? 0.88 : 1.18;
+
+      // risk tolerance influences speed vs safety
+      const riskTol = bp.riskTol;
+      const riskMult = riskTol === 'low' ? 0.82 : riskTol === 'high' ? 1.18 : 1.0;
+
+      // guardrails increase safety but add cost
+      const guard = bp.guardrails;
+      const guardMult = guard === 'strict' ? 1.24 : guard === 'loose' ? 0.92 : 1.0;
+
+      const effectiveSteps = Math.round(baseSteps * stratMult);
+
+      const tokensPerStep = 650 + 240*(nNodes/6) + 180*depth + 220*strict + 140*temps;
+      const estTokens = clamp(effectiveSteps * tokensPerStep * guardMult, 200, tokenBudget*1.08);
+
+      const toolCallsPerStep = 0.18 + 0.02*nEdges + 0.08*toolList.length/6;
+      const toolCalls = clamp(effectiveSteps * toolCallsPerStep, 0, effectiveSteps*1.2);
+
+      const avgToolLatency = toolList.reduce((sum,id) => sum + (TOOLS.find(t => t.id===id)?.latency||0), 0) / Math.max(1,toolList.length);
+      const estLatency = 550*effectiveSteps + avgToolLatency*toolCalls * (guard==='strict' ? 1.06 : 1.0);
+
+      const baseCostPerTok = 0.00000018; // not real, just a scaling
+      const estCost = estTokens * baseCostPerTok * (strat==='reflex' ? 1.15 : 1.0) * (bp.memoryPolicy==='vector' ? 1.10 : 1.0);
+
+      // Reliability / safety heuristics
+      const perm = bp.permMode;
+      const permPenalty = perm === 'free' ? 0.14 : perm === 'sandbox' ? 0.05 : 0.08;
+      const failureRate = clamp(0.06 + toolRisk*0.22 + (riskTol==='high'?0.08:0) + permPenalty + (depth*0.03) - (guard==='strict'?0.05:0), 0.03, 0.55);
+      const safetyScore = clamp(0.70 + (guard==='strict'?0.18:guard==='loose'?-0.10:0) + (riskTol==='low'?0.08:riskTol==='high'?-0.10:0) + (perm==='confirm'?0.06:perm==='free'?-0.12:0), 0.05, 0.98);
+
+      const throughput = estTokens / Math.max(1000, estLatency/1000);
+
+      state.run.metrics = {
+        effectiveSteps,
+        estTokens,
+        estLatency,
+        estCost,
+        failureRate,
+        safetyScore,
+        throughput,
+        toolCalls,
+        avgToolRisk: toolRisk,
+      };
+
+      const latS = (estLatency/1000).toFixed(1);
+      const msg = `Est. ${effectiveSteps} steps · ${fmt(estTokens,0)} tokens · ${latS}s · ${usd(estCost)} · fail ${(failureRate*100).toFixed(0)}% · safety ${(safetyScore*100).toFixed(0)}%`;
+      el.miniForecast.textContent = msg;
+
+      // explanation text
+      state.run.explain = [
+        `Forecast generated at ${nowISO()}.`,
+        `Strategy=${bp.strategy} changes planning overhead: ReAct=baseline, Plan-Execute slightly fewer steps, Reflexion adds self-review loops.`,
+        `Guardrails=${bp.guardrails} affects safety vs cost: strict adds more checks and more tokens.`,
+        `Tool risk is the mean risk of enabled tools (higher = more failure injection).`,
+        `Failure rate combines tool risk, research depth, risk tolerance, and permission mode.`,
+        `Tokens/step increases with node count and the depth/strictness of roles.`,
+        `Cost is a scaled function of tokens, memory policy, and strategy (illustrative).`
+      ].join('\n');
+
+      if(state.rightPanel === 'metrics') renderMetrics();
+    }
+
+    function renderMetrics(){
+      const m = state.run.metrics;
+      if(!m){
+        el.metricGrid.innerHTML = '';
+        el.metricExplain.textContent = '';
+        return;
+      }
+
+      const items = [
+        {k:'Effective steps', v: m.effectiveSteps, p: clamp(m.effectiveSteps/30,0,1)},
+        {k:'Tokens', v: fmt(m.estTokens,0), p: clamp(m.estTokens/30000,0,1)},
+        {k:'Latency', v: (m.estLatency/1000).toFixed(1)+'s', p: clamp(m.estLatency/45000,0,1)},
+        {k:'Tool calls', v: fmt(m.toolCalls,1), p: clamp(m.toolCalls/22,0,1)},
+        {k:'Cost', v: usd(m.estCost), p: clamp(m.estCost/0.02,0,1)},
+        {k:'Failure rate', v: (m.failureRate*100).toFixed(0)+'%', p: clamp(m.failureRate/0.5,0,1), tone: m.failureRate>0.25?'bad':m.failureRate>0.16?'warn':'good'},
+        {k:'Safety', v: (m.safetyScore*100).toFixed(0)+'%', p: clamp(m.safetyScore/1,0,1), tone: m.safetyScore<0.55?'bad':m.safetyScore<0.72?'warn':'good'},
+        {k:'Throughput', v: fmt(m.throughput,0)+' tok/s', p: clamp(m.throughput/2000,0,1)},
+      ];
+
+      el.metricGrid.innerHTML = '';
+      for(const it of items){
+        const div = document.createElement('div');
+        div.className = 'metric';
+        div.innerHTML = `
+          <div style="flex:1;">
+            <div class="name">${esc(it.k)}</div>
+            <div class="bar"><i style="width:${(it.p*100).toFixed(1)}%; background:${barColor(it)}"></i></div>
+          </div>
+          <div class="val">${esc(it.v)}</div>
+        `;
+        el.metricGrid.appendChild(div);
+      }
+
+      el.metricExplain.textContent = state.run.explain || '';
+    }
+
+    function barColor(it){
+      if(it.tone==='bad') return 'linear-gradient(90deg, rgba(255,92,147,0.95), rgba(109,92,255,0.75))';
+      if(it.tone==='warn') return 'linear-gradient(90deg, rgba(255,204,102,0.95), rgba(35,213,255,0.65))';
+      if(it.tone==='good') return 'linear-gradient(90deg, rgba(55,243,165,0.95), rgba(35,213,255,0.75))';
+      return 'linear-gradient(90deg, rgba(35,213,255,0.9), rgba(109,92,255,0.85))';
+    }
+
+    // ---------- Run engine ----------
+    function currentBlueprint(){
+      return {
+        agentName: el.agentName.value.trim() || 'Agent',
+        goalPreset: el.goalPreset.value,
+        goalPrompt: el.goalPrompt.value,
+        riskTol: el.riskTol.value,
+        permMode: el.permMode.value,
+        stepBudget: parseInt(el.stepBudget.value,10) || 18,
+        tokenBudget: parseInt(el.tokenBudget.value,10) || 18000,
+        memoryPolicy: el.memoryPolicy.value,
+        guardrails: el.guardrails.value,
+        strategy: state.strategy,
+        toolsEnabled: deepClone(state.tools),
+        nodes: deepClone(state.nodes),
+        edges: deepClone(state.edges),
+      };
+    }
+
+    function runOnce(customStrategy=null){
+      if(state.run.status === 'running') return;
+
+      const bp = currentBlueprint();
+      if(customStrategy) bp.strategy = customStrategy;
+
+      if(bp.nodes.length === 0){
+        toast('Add at least one node to run.');
+        return;
+      }
+
+      state.run.status = 'running';
+      setRightPanel('trace');
+
+      // seed derived from blueprint so same config = same run
+      const seed = hashString(JSON.stringify(bp));
+      state.run.seed = seed;
+      const rand = mulberry32(seed);
+
+      // derive effective steps and budgets
+      recalcForecast();
+      const m = state.run.metrics;
+      const maxSteps = clamp(m.effectiveSteps, 3, 60);
+
+      const enabled = enabledTools();
+
+      const roleOrder = computeTraversal(bp.nodes, bp.edges, rand);
+      const events = [];
+
+      let totalTokens = 0;
+      let totalCost = 0;
+      let totalLatency = 0;
+      let memoryItems = [];
+      let success = true;
+      let stopReason = '';
+
+      const safety = safetyProfile(bp);
+
+      for(let step=1; step<=maxSteps; step++){
+        const role = roleOrder[(step-1) % roleOrder.length];
+        const stepSeed = Math.floor(rand()*1e9);
+
+        const stepEvent = simulateStep({
+          step,
+          role,
+          bp,
+          enabled,
+          rand,
+          stepSeed,
+          safety,
+          memoryItems,
+        });
+
+        events.push(stepEvent);
+        totalTokens += stepEvent.tokens;
+        totalCost += stepEvent.cost;
+        totalLatency += stepEvent.latency;
+
+        if(stepEvent.memoryWrite){
+          memoryItems.push(stepEvent.memoryWrite);
+          if(memoryItems.length > memoryCap(bp)) memoryItems = memoryItems.slice(-memoryCap(bp));
+        }
+
+        if(stepEvent.status === 'blocked'){
+          success = false;
+          stopReason = stepEvent.blockReason || 'blocked by safety policy';
+          break;
+        }
+        if(stepEvent.status === 'failed'){
+          // some strategies recover
+          const canRecover = bp.strategy !== 'plan' && rand() < 0.45;
+          if(canRecover){
+            events.push(recoveryEvent(step+0.1, role, rand));
+            continue;
+          }
+          success = false;
+          stopReason = stepEvent.failReason || 'tool failure';
+          break;
+        }
+
+        // stop if token budget exceeded
+        if(totalTokens > bp.tokenBudget){
+          success = false;
+          stopReason = 'token budget exceeded';
+          events.push({
+            step: step+0.2,
+            role: 'system',
+            status: 'blocked',
+            title: 'Budget stop',
+            meta: {tokens: 0, cost: 0, latency: 0},
+            details: `Stopped because estimated total tokens (${fmt(totalTokens,0)}) exceeded token budget (${fmt(bp.tokenBudget,0)}).`,
+            kind: 'budget',
+          });
+          break;
+        }
+      }
+
+      const summary = finalizeMetrics(bp, m, {totalTokens, totalCost, totalLatency, success, stopReason, events});
+
+      state.run.events = events;
+      state.run.metrics = summary.metrics;
+      state.run.explain = summary.explain;
+      state.run.status = 'idle';
+
+      renderTrace();
+      renderMetrics();
+      draw();
+      updateHash();
+
+      toast(success ? 'Run complete.' : `Run stopped: ${stopReason}`);
+    }
+
+    function memoryCap(bp){
+      if(bp.memoryPolicy === 'short') return 10;
+      if(bp.memoryPolicy === 'episodic') return 22;
+      return 42;
+    }
+
+    function safetyProfile(bp){
+      const guard = bp.guardrails;
+      const perm = bp.permMode;
+      const riskTol = bp.riskTol;
+
+      const strictness =
+        (guard === 'strict' ? 0.85 : guard === 'loose' ? 0.40 : 0.62)
+        + (perm === 'confirm' ? 0.08 : perm === 'free' ? -0.10 : 0)
+        + (riskTol === 'low' ? 0.06 : riskTol === 'high' ? -0.08 : 0);
+
+      return {
+        strictness: clamp(strictness, 0.05, 0.95),
+        requireConfirmFor: new Set(['deploy','db','files']),
+        sandboxOnly: perm === 'sandbox',
+      };
+    }
+
+    function computeTraversal(nodes, edges, rand){
+      // Build adjacency and pick a sensible role order.
+      // We'll attempt a topological-ish walk from planner; if disconnected, fallback.
+      const byId = new Map(nodes.map(n => [n.id, n]));
+      const out = new Map(nodes.map(n => [n.id, []]));
+      for(const e of edges){
+        if(out.has(e.from)) out.get(e.from).push(e.to);
+      }
+
+      const start = nodes.find(n => n.type === 'planner') || nodes[0];
+      const visited = new Set();
+      const order = [];
+
+      function walk(id, depth){
+        if(depth>32) return;
+        if(visited.has(id)) return;
+        visited.add(id);
+        const node = byId.get(id);
+        if(node) order.push(node.type);
+        const next = (out.get(id) || []).slice();
+        // randomize
+        for(let i=next.length-1;i>0;i--){
+          const j = Math.floor(rand()*(i+1));
+          [next[i], next[j]] = [next[j], next[i]];
+        }
+        for(const nid of next) walk(nid, depth+1);
+      }
+
+      walk(start.id, 0);
+
+      // add remaining nodes
+      for(const n of nodes){
+        if(!visited.has(n.id)) order.push(n.type);
+      }
+
+      // compress duplicates a bit
+      const compact = [];
+      for(const t of order){
+        if(compact.length===0 || compact[compact.length-1] !== t) compact.push(t);
+      }
+
+      return compact.length ? compact : ['planner','researcher','coder','critic','tool'];
+    }
+
+    function simulateStep({step, role, bp, enabled, rand, stepSeed, safety, memoryItems}){
+      const roleNode = bp.nodes.find(n => n.type === role);
+      const r = rand();
+
+      const baseTokens = 520 + 120*(bp.nodes.length/6);
+      const roleTok = role === 'researcher' ? 420*(roleNode?.params?.depth||2) : role === 'critic' ? 350*(roleNode?.params?.strictness||0.7) : role === 'planner' ? 220*(roleNode?.params?.temperature||0.35) : 240;
+
+      const guardMult = bp.guardrails === 'strict' ? 1.22 : bp.guardrails === 'loose' ? 0.92 : 1.0;
+      const strategyMult = bp.strategy === 'plan' ? 0.92 : bp.strategy === 'reflex' ? 1.12 : 1.0;
+
+      let tokens = Math.round((baseTokens + roleTok) * guardMult * strategyMult);
+      let latency = 450 + 120*rnd(0.3,1.3);
+
+      // Determine tool call
+      let toolCall = null;
+      if(role === 'tool' || (role === 'coder' && rand() < 0.45) || (role === 'researcher' && rand() < 0.55)){
+        const allowed = enabled.slice();
+        if(roleNode?.type === 'tool' && Array.isArray(roleNode?.params?.toolset)){
+          // restrict to selected
+          const picks = roleNode.params.toolset.filter(x => enabled.includes(x));
+          if(picks.length) allowed.splice(0, allowed.length, ...picks);
+        }
+
+        if(allowed.length){
+          const tid = allowed[Math.floor(rand()*allowed.length)];
+          const t = TOOLS.find(x => x.id === tid);
+          toolCall = {id: tid, name: t.name, kind: t.kind, risk: t.risk};
+          latency += t.latency * (bp.guardrails==='strict' ? 1.05 : 1.0);
+          tokens += Math.round(160 + 280*rand());
+        }
+      }
+
+      // memory read/write
+      const memRead = memoryItems.length ? memoryItems[Math.floor(rand()*memoryItems.length)] : null;
+      const memWriteChance = bp.memoryPolicy === 'short' ? 0.18 : bp.memoryPolicy === 'episodic' ? 0.32 : 0.42;
+      const memoryWrite = (rand() < memWriteChance) ? makeMemoryNote(step, role, rand) : null;
+      if(memoryWrite) tokens += 90;
+
+      // risk / failure injection
+      const riskTol = bp.riskTol;
+      const riskBias = riskTol === 'high' ? 0.10 : riskTol === 'low' ? -0.06 : 0;
+      const baseFail = 0.04 + (toolCall ? toolCall.risk*0.18 : 0) + riskBias;
+      const depthFail = role === 'researcher' ? (roleNode?.params?.depth||2)*0.02 : 0;
+      const guardReduce = bp.guardrails === 'strict' ? -0.03 : 0;
+      const failP = clamp(baseFail + depthFail + guardReduce, 0.02, 0.42);
+
+      // Safety policy blocks dangerous tools
+      if(toolCall && safety.requireConfirmFor.has(toolCall.id)){
+        if(bp.permMode === 'sandbox'){
+          return {
+            step,
+            role,
+            status: 'blocked',
+            title: `${roleTitle(role)} attempted ${toolCall.name}`,
+            meta: {tokens: 0, cost: 0, latency: 0},
+            details: `Tool <b>${esc(toolCall.name)}</b> requires elevated permissions, but permission mode is <b>Sandbox only</b>.
+\n\nSuggestion: switch to <b>Confirm dangerous tools</b> or disable ${esc(toolCall.name)}.`,
+            kind: 'policy',
+            blockReason: 'sandbox policy blocked a dangerous tool',
+          };
+        }
+        if(bp.permMode === 'confirm'){
+          // confirmation step: pass only if strictness isn't too high and random approves
+          const approveP = clamp(0.75 - (safety.strictness-0.55)*0.9, 0.12, 0.90);
+          const approved = rand() < approveP;
+          tokens += 120;
+          latency += 520;
+          if(!approved){
+            return {
+              step,
+              role,
+              status: 'blocked',
+              title: `Confirmation denied: ${toolCall.name}`,
+              meta: {tokens, cost: costFrom(tokens), latency},
+              details: `The agent asked to run <b>${esc(toolCall.name)}</b>, but the human-in-the-loop policy denied it.
+\n\nReason: risk score too high given guardrails=${esc(bp.guardrails)} and riskTol=${esc(bp.riskTol)}.`,
+              kind: 'policy',
+              blockReason: 'confirmation denied',
+            };
+          }
+        }
+      }
+
+      // hallucinated citation / wrong tool usage
+      const hallucinateP = clamp(0.03 + (bp.guardrails==='loose'?0.05:0) + (role==='researcher'?0.04:0) - (bp.guardrails==='strict'?0.03:0), 0.01, 0.22);
+      const hallucinated = rand() < hallucinateP;
+
+      // tool failure
+      const failed = rand() < failP;
+      let status = failed ? 'failed' : 'ok';
+      let kind = failed ? 'failure' : 'work';
+
+      // reflexion adds self-critique events
+      let reflexNote = '';
+      if(bp.strategy === 'reflex' && (role==='critic' || rand()<0.16)){
+        tokens += 180;
+        latency += 240;
+        reflexNote = makeReflexion(role, rand);
+      }
+
+      const detailsLines = [];
+      detailsLines.push(`<b>Goal</b>: ${esc(bp.goalPreset)} — ${esc(GOAL_PRESETS[bp.goalPreset].title)}`);
+
+      if(memRead){
+        detailsLines.push(`<b>Memory read</b>: ${esc(memRead.summary)}`);
+      }
+
+      if(toolCall){
+        detailsLines.push(`<b>Tool call</b>: ${esc(toolCall.name)} (${esc(toolCall.kind)})`);
+        const toolOutcome = failed ? sampleToolFailure(toolCall.id, rand) : sampleToolSuccess(toolCall.id, rand);
+        detailsLines.push(`<b>Tool outcome</b>: ${esc(toolOutcome)}`);
+      } else {
+        detailsLines.push(`<b>Tool call</b>: none`);
+      }
+
+      if(hallucinated){
+        kind = 'quality';
+        detailsLines.push(`<b>Quality check</b>: detected a likely hallucinated reference; requested verification.`);
+        if(bp.guardrails === 'strict'){
+          tokens += 140;
+          latency += 340;
+          detailsLines.push(`<b>Guardrails</b>: strict mode forced a source validation step.`);
+        }
+      }
+
+      if(reflexNote){
+        detailsLines.push(`<b>Reflexion</b>: ${esc(reflexNote)}`);
+      }
+
+      if(memoryWrite){
+        detailsLines.push(`<b>Memory write</b>: ${esc(memoryWrite.summary)}`);
+      }
+
+      let failReason = '';
+      if(failed){
+        failReason = toolCall ? 'tool error' : 'planning error';
+        detailsLines.push(`<b>Failure</b>: ${esc(sampleFailureExplanation(role, toolCall, rand))}`);
+        if(bp.strategy === 'plan'){
+          detailsLines.push(`<b>Plan-Execute</b>: failure is harder to recover because execution follows a fixed plan.`);
+        }
+      }
+
+      // cost/latency per token for realism
+      const cost = costFrom(tokens);
+
+      return {
+        step,
+        role,
+        status,
+        title: `${roleTitle(role)} step`,
+        meta: {tokens, cost, latency},
+        details: detailsLines.join('\n'),
+        kind,
+        toolCall,
+        memoryWrite,
+        failReason,
+        stepSeed,
+      };
+    }
+
+    function costFrom(tokens){
+      // scaled illustrative cost
+      return tokens * 0.00000018;
+    }
+
+    function roleTitle(role){
+      if(role==='planner') return 'Planner';
+      if(role==='researcher') return 'Researcher';
+      if(role==='coder') return 'Coder';
+      if(role==='critic') return 'Critic';
+      if(role==='tool') return 'Tool router';
+      if(role==='memory') return 'Memory';
+      return role;
+    }
+
+    function sampleToolFailure(toolId, rand){
+      const choices = {
+        web: ['HTTP 429: rate limit', 'Search results irrelevant', 'Network timeout', 'Robots policy denied'],
+        repo: ['File not found', 'Permission denied', 'Binary file unreadable', 'Huge diff truncated'],
+        code: ['Runtime error: missing dependency', 'Segmentation fault in native lib', 'Sandbox disk full', 'Command exceeded time limit'],
+        tests: ['Flaky test failed', 'Timeout: integration suite', 'Snapshot mismatch', 'Port already in use'],
+        files: ['Patch conflict', 'Line endings mismatch', 'Refused to modify protected file', 'Invalid JSON after edit'],
+        db: ['Query timed out', 'Deadlock detected', 'Permissions error', 'Schema mismatch'],
+        email: ['SMTP refused', 'Draft rejected by policy', 'Attachment too large', 'Invalid address'],
+        deploy: ['Build failed', 'Secrets missing', 'Rollback triggered', 'Health check failed'],
+        calendar: ['Event not found', 'API quota exceeded', 'Timezone mismatch', 'Auth expired'],
+        notion: ['Page locked', 'Rate limited', 'Block type invalid', 'Permission denied'],
+        slack: ['Channel not found', 'Message rejected', 'Rate limited', 'Token revoked'],
+      };
+      const arr = choices[toolId] || ['Unknown tool failure'];
+      return arr[Math.floor(rand()*arr.length)];
+    }
+
+    function sampleToolSuccess(toolId, rand){
+      const choices = {
+        web: ['Found 4 relevant sources', 'Retrieved official docs', 'Got benchmark table', 'Found discussion thread with pitfalls'],
+        repo: ['Loaded module structure', 'Found TODO and tests', 'Identified call site', 'Found flaky test history'],
+        code: ['Ran script successfully', 'Reproduced bug locally', 'Generated patch', 'Validated output'],
+        tests: ['All tests passed', 'Flake resolved after retry', 'Coverage increased', 'Added regression test'],
+        files: ['Patch applied cleanly', 'Refactored safely', 'Updated config', 'Formatted files'],
+        db: ['Query succeeded', 'Indexed hot path', 'Exported metrics', 'Validated constraint'],
+        email: ['Draft created', 'Subject improved', 'Wrote crisp summary', 'Added action items'],
+        deploy: ['Canary deployed', 'Health checks green', 'Release notes generated', 'Rollback plan ready'],
+        calendar: ['Found meeting notes', 'Identified stakeholders', 'Extracted agenda', 'Resolved conflict'],
+        notion: ['Updated doc', 'Added checklist', 'Linked references', 'Created new page'],
+        slack: ['Posted update', 'Shared incident summary', 'Created thread', 'Pinned message'],
+      };
+      const arr = choices[toolId] || ['Success'];
+      return arr[Math.floor(rand()*arr.length)];
+    }
+
+    function sampleFailureExplanation(role, toolCall, rand){
+      const base = [
+        'Insufficient context led to a wrong assumption.',
+        'The agent attempted an action before verifying prerequisites.',
+        'A hidden dependency was missed and caused a cascade.',
+        'Ambiguous goal interpretation caused a detour.',
+        'The environment constraint (sandbox) prevented a needed action.'
+      ];
+      const toolish = [
+        'Tool output was noisy; the agent did not validate it.',
+        'A retry/backoff policy was missing.',
+        'The tool returned partial data and the agent over-trusted it.',
+        'The tool contract changed (schema mismatch).'
+      ];
+      const arr = toolCall ? base.concat(toolish) : base;
+      return arr[Math.floor(rand()*arr.length)];
+    }
+
+    function makeReflexion(role, rand){
+      const notes = [
+        'I should verify constraints before acting and keep a rollback plan.',
+        'My previous step assumed the tool output was correct; next time I will cross-check.',
+        'I need to shorten the plan and focus on the minimum viable fix.',
+        'The safest move is to add a guardrail check and rerun tests.',
+        'I should write down intermediate conclusions to avoid loops.'
+      ];
+      const extra = role==='critic' ? ' Also: I will tighten acceptance criteria.' : '';
+      return notes[Math.floor(rand()*notes.length)] + extra;
+    }
+
+    function makeMemoryNote(step, role, rand){
+      const snippets = [
+        'Identified likely root cause and reproduction steps.',
+        'Validated hypothesis with a quick experiment.',
+        'Pinned a key constraint and an acceptance test.',
+        'Noted a risk and a mitigation plan.',
+        'Saved a concise summary for later steps.'
+      ];
+      const summary = `${roleTitle(role)}@${step}: ${snippets[Math.floor(rand()*snippets.length)]}`;
+      return {
+        ts: Date.now(),
+        step,
+        role,
+        summary,
+      };
+    }
+
+    function recoveryEvent(stepLike, role, rand){
+      const t = rand();
+      const tokens = Math.round(260 + 220*t);
+      const latency = 340 + 220*t;
+      return {
+        step: stepLike,
+        role,
+        status: 'ok',
+        title: 'Recovery loop',
+        meta: {tokens, cost: costFrom(tokens), latency},
+        details: `The agent detected a failure and attempted a recovery:
+- Added a retry/backoff wrapper
+- Reduced tool calls
+- Narrowed the plan to the minimal fix`,
+        kind: 'recovery',
+      };
+    }
+
+    function finalizeMetrics(bp, forecast, {totalTokens, totalCost, totalLatency, success, stopReason, events}){
+      const eff = forecast || state.run.metrics;
+      const stepsTaken = events.filter(e => typeof e.step === 'number' && Number.isInteger(e.step)).length;
+      const failCount = events.filter(e => e.status==='failed').length;
+      const blockedCount = events.filter(e => e.status==='blocked').length;
+
+      const safety = clamp(eff.safetyScore + (blockedCount?0.06:0) - (bp.guardrails==='loose'?0.06:0), 0.05, 0.98);
+      const failureRateObserved = clamp((failCount + blockedCount) / Math.max(1, stepsTaken), 0, 1);
+
+      const metrics = {
+        effectiveSteps: eff.effectiveSteps,
+        stepsTaken,
+        estTokens: eff.estTokens,
+        tokensUsed: totalTokens,
+        estLatency: eff.estLatency,
+        latency: totalLatency,
+        estCost: eff.estCost,
+        cost: totalCost,
+        failureRate: eff.failureRate,
+        failureRateObserved,
+        safetyScore: safety,
+        toolCalls: eff.toolCalls,
+        avgToolRisk: eff.avgToolRisk,
+        success,
+      };
+
+      const explain = [
+        `Run summary at ${nowISO()}.`,
+        `Steps taken: ${stepsTaken}/${eff.effectiveSteps} (budget=${bp.stepBudget}).`,
+        `Tokens used: ${fmt(totalTokens,0)} (forecast ${fmt(eff.estTokens,0)}; cap ${fmt(bp.tokenBudget,0)}).`,
+        `Latency: ${(totalLatency/1000).toFixed(1)}s (forecast ${(eff.estLatency/1000).toFixed(1)}s).`,
+        `Outcome: ${success ? 'SUCCESS' : 'STOPPED'}${success?'':` — ${stopReason}`}.`,
+        `Observed failure rate: ${(failureRateObserved*100).toFixed(0)}% (forecast ${(eff.failureRate*100).toFixed(0)}%).`,
+        `Safety score adjusted for policy blocks: ${(safety*100).toFixed(0)}%.`,
+        `Tip: enable fewer high-risk tools or use strict guardrails for production-like runs.`
+      ].join('\n');
+
+      return {metrics, explain};
+    }
+
+    // ---------- Trace rendering ----------
+    function renderTrace(){
+      const events = state.run.events || [];
+      if(events.length === 0){
+        el.traceList.innerHTML = `<div class="small muted">No run yet. Press Space or click Run.</div>`;
+        return;
+      }
+
+      el.traceList.innerHTML = '';
+      for(const ev of events){
+        const badgeTone = ev.status === 'ok' ? 'good' : ev.status === 'blocked' ? 'warn' : 'bad';
+        const badgeText = ev.status.toUpperCase();
+        const meta = ev.meta || {tokens:0,cost:0,latency:0};
+        const title = ev.title || 'Step';
+
+        const div = document.createElement('div');
+        div.className = 'event';
+        div.innerHTML = `
+          <div class="head">
+            <div>
+              <span class="badge ${badgeTone}"><span class="dot"></span><span>${esc(title)}</span></span>
+              <div class="small muted" style="margin-top:8px;">Step <b>${esc(ev.step)}</b> · role <b>${esc(ev.role)}</b></div>
+            </div>
+            <div class="meta">
+              <span>${fmt(meta.tokens,0)} tok</span>
+              <span>${usd(meta.cost||0)}</span>
+              <span>${ms(meta.latency||0)}</span>
+              <span class="pill"><b>${badgeText}</b></span>
+            </div>
+          </div>
+          <pre>${esc(ev.details || '')}</pre>
+        `;
+
+        // click to focus a related node
+        div.addEventListener('click', () => {
+          // pick node by role if exists
+          const node = state.nodes.find(n => n.type === ev.role);
+          if(node){
+            state.selectedNodeId = node.id;
+            centerOn(node.x, node.y);
+            draw();
+          }
+        });
+
+        el.traceList.appendChild(div);
+      }
+    }
+
+    function centerOn(x,y){
+      // center world (x,y) into canvas
+      state.pan.x = -x;
+      state.pan.y = -y;
+    }
+
+    // ---------- Strategy compare ----------
+    function compareStrategies(){
+      const bp0 = currentBlueprint();
+      const strategies = ['react','plan','reflex'];
+      const results = [];
+
+      for(const s of strategies){
+        const bp = deepClone(bp0);
+        bp.strategy = s;
+
+        // seed must differ by strategy
+        const seed = hashString(JSON.stringify(bp));
+        const rand = mulberry32(seed);
+
+        // generate forecast for this blueprint
+        const tempStrategy = state.strategy;
+        state.strategy = s;
+        recalcForecast();
+        const forecast = deepClone(state.run.metrics);
+        state.strategy = tempStrategy;
+        updateStrategyTabs();
+
+        // quick run (shortened)
+        const roleOrder = computeTraversal(bp.nodes, bp.edges, rand);
+        const enabled = Object.entries(bp.toolsEnabled).filter(([k,v]) => v).map(([k]) => k);
+        const safety = safetyProfile(bp);
+
+        let totalTokens=0, totalCost=0, totalLatency=0;
+        let memoryItems=[];
+        let success=true;
+        let stopReason='';
+        const events=[];
+
+        const maxSteps = clamp(Math.round(forecast.effectiveSteps), 3, 60);
+        for(let step=1; step<=maxSteps; step++){
+          const role = roleOrder[(step-1)%roleOrder.length];
+          const ev = simulateStep({step, role, bp, enabled, rand, stepSeed: Math.floor(rand()*1e9), safety, memoryItems});
+          events.push(ev);
+          totalTokens += ev.meta?.tokens||0;
+          totalCost += ev.meta?.cost||0;
+          totalLatency += ev.meta?.latency||0;
+          if(ev.memoryWrite){
+            memoryItems.push(ev.memoryWrite);
+            if(memoryItems.length > memoryCap(bp)) memoryItems = memoryItems.slice(-memoryCap(bp));
+          }
+          if(ev.status !== 'ok'){
+            success = false;
+            stopReason = ev.status === 'blocked' ? (ev.blockReason || 'policy block') : (ev.failReason || 'failure');
+            break;
+          }
+          if(totalTokens > bp.tokenBudget){
+            success = false;
+            stopReason = 'token budget exceeded';
+            break;
+          }
+        }
+
+        const summary = finalizeMetrics(bp, forecast, {totalTokens, totalCost, totalLatency, success, stopReason, events});
+        results.push({
+          strategy: s,
+          bp,
+          forecast,
+          metrics: summary.metrics,
+          events,
+        });
+      }
+
+      state.run.compare = results;
+      setRightPanel('compare');
+      renderCompare();
+      toast('Comparison complete. Click a strategy card to load it.');
+    }
+
+    function renderCompare(){
+      const res = state.run.compare;
+      if(!res){
+        el.compareGrid.innerHTML = '<div class="small muted">No comparison yet. Click Compare.</div>';
+        return;
+      }
+
+      el.compareGrid.innerHTML = '';
+      for(const r of res){
+        const name = r.strategy==='react' ? 'ReAct' : r.strategy==='plan' ? 'Plan-Execute' : 'Reflexion';
+        const m = r.metrics;
+        const tone = m.success ? 'ok' : (m.failureRateObserved > 0.12 ? 'danger' : '');
+        const box = document.createElement('div');
+        box.className = 'card ' + tone;
+        box.style.boxShadow = 'none';
+        box.innerHTML = `
+          <div class="card-header">
+            <div>
+              <h2>${esc(name)}</h2>
+              <p>${esc(m.success ? 'Completed without stop' : 'Stopped early')}</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="metric" style="margin-bottom:10px;">
+              <div style="flex:1;">
+                <div class="name">Tokens used</div>
+                <div class="bar"><i style="width:${clamp(m.tokensUsed/Math.max(1,m.estTokens),0,1)*100}%;"></i></div>
+              </div>
+              <div class="val">${fmt(m.tokensUsed,0)}</div>
+            </div>
+
+            <div class="metric" style="margin-bottom:10px;">
+              <div style="flex:1;">
+                <div class="name">Latency</div>
+                <div class="bar"><i style="width:${clamp(m.latency/Math.max(1,m.estLatency),0,1)*100}%;"></i></div>
+              </div>
+              <div class="val">${(m.latency/1000).toFixed(1)}s</div>
+            </div>
+
+            <div class="metric" style="margin-bottom:10px;">
+              <div style="flex:1;">
+                <div class="name">Observed failure</div>
+                <div class="bar"><i style="width:${clamp(m.failureRateObserved,0,1)*100}%; background:${m.failureRateObserved>0.12?'linear-gradient(90deg, rgba(255,92,147,0.95), rgba(109,92,255,0.75))':'linear-gradient(90deg, rgba(55,243,165,0.95), rgba(35,213,255,0.75))'}"></i></div>
+              </div>
+              <div class="val">${(m.failureRateObserved*100).toFixed(0)}%</div>
+            </div>
+
+            <div class="metric">
+              <div style="flex:1;">
+                <div class="name">Safety</div>
+                <div class="bar"><i style="width:${clamp(m.safetyScore,0,1)*100}%;"></i></div>
+              </div>
+              <div class="val">${(m.safetyScore*100).toFixed(0)}%</div>
+            </div>
+
+            <div class="divider"></div>
+            <div class="small muted">Click to load this strategy.</div>
+          </div>
+        `;
+
+        box.addEventListener('click', () => {
+          // load blueprint and run trace
+          state.strategy = r.strategy;
+          updateStrategyTabs();
+          applyBlueprint(r.bp);
+          state.run.events = r.events;
+          state.run.metrics = r.metrics;
+          renderTrace();
+          renderMetrics();
+          setRightPanel('trace');
+          updateHash();
+          toast(`Loaded ${name}.`);
+        });
+
+        el.compareGrid.appendChild(box);
+      }
+    }
+
+    // ---------- Shareable hash ----------
+    function updateHash(){
+      const bp = currentBlueprint();
+      const compact = {
+        v: 1,
+        a: bp.agentName,
+        g: bp.goalPreset,
+        p: bp.goalPrompt,
+        r: bp.riskTol,
+        m: bp.permMode,
+        sb: bp.stepBudget,
+        tb: bp.tokenBudget,
+        mp: bp.memoryPolicy,
+        gr: bp.guardrails,
+        st: bp.strategy,
+        te: bp.toolsEnabled,
+        n: bp.nodes.map(n => ({id:n.id,t:n.type,l:n.label,x:Math.round(n.x),y:Math.round(n.y),pa:n.params})),
+        e: bp.edges,
+      };
+
+      const json = JSON.stringify(compact);
+      const b64 = btoa(unescape(encodeURIComponent(json)));
+      location.hash = b64;
+    }
+
+    function loadFromHash(){
+      if(!location.hash || location.hash.length < 2) return null;
+      try{
+        const b64 = location.hash.slice(1);
+        const json = decodeURIComponent(escape(atob(b64)));
+        const obj = JSON.parse(json);
+        if(!obj || obj.v !== 1) return null;
+
+        // inflate
+        const bp = deepClone(DEFAULT_BLUEPRINT);
+        bp.agentName = obj.a || bp.agentName;
+        bp.goalPreset = obj.g || bp.goalPreset;
+        bp.goalPrompt = obj.p || bp.goalPrompt;
+        bp.riskTol = obj.r || bp.riskTol;
+        bp.permMode = obj.m || bp.permMode;
+        bp.stepBudget = obj.sb || bp.stepBudget;
+        bp.tokenBudget = obj.tb || bp.tokenBudget;
+        bp.memoryPolicy = obj.mp || bp.memoryPolicy;
+        bp.guardrails = obj.gr || bp.guardrails;
+        bp.strategy = obj.st || bp.strategy;
+        bp.toolsEnabled = obj.te || bp.toolsEnabled;
+        bp.nodes = (obj.n || bp.nodes).map(n => ({id:n.id, type:n.t, label:n.l, x:n.x, y:n.y, params:n.pa||{}}));
+        bp.edges = obj.e || bp.edges;
+        return bp;
+      } catch(err){
+        console.warn('bad hash', err);
+        return null;
+      }
+    }
+
+    // ---------- Toast ----------
+    function toast(msg){
+      el.toastMsg.textContent = msg;
+      el.toast.classList.add('show');
+      if(state.ui.toastTimer) clearTimeout(state.ui.toastTimer);
+      state.ui.toastTimer = setTimeout(() => hideToast(), 3600);
+    }
+
+    function hideToast(){
+      el.toast.classList.remove('show');
+    }
+
+    // ---------- Animation tick ----------
+    function tick(){
+      // subtle pulse: if running, animate run button
+      if(state.run.status === 'running'){
+        el.btnRun.style.filter = `hue-rotate(${(Date.now()/25)%360}deg)`;
+      } else {
+        el.btnRun.style.filter = '';
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // ---------- Boot ----------
+    init();
+  </script>
+</body>
+</html>
